@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#11172b">
+  <title>Pixel Gol — Flappy Bird</title>
+  <style>
+    :root { color-scheme: dark; --ink:#f7f2df; --muted:#aab4cc; --gold:#ffd45b; --mint:#89f0bb; --panel:#151d34; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px; overflow-x:hidden; color:var(--ink); font-family:ui-rounded,"Trebuchet MS",system-ui,sans-serif; background:radial-gradient(ellipse at 50% 0%,#263b60 0,#151d34 45%,#0b1020 100%); }
+    .shell { width:min(100%,1000px); }
+    .brand { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 4px 12px; }
+    .brand h1 { margin:0; font-size:clamp(20px,3vw,30px); letter-spacing:.04em; text-transform:uppercase; }
+    .brand h1 span { color:var(--gold); }
+    .brand-note { color:var(--muted); font-size:13px; }
+    .stage { position:relative; width:100%; aspect-ratio:8/5; overflow:hidden; border:3px solid #d8c88b; border-radius:16px; background:#182741; box-shadow:0 18px 55px #0008, inset 0 0 0 4px #11182b; }
+    canvas { display:block; width:100%; height:100%; image-rendering:pixelated; touch-action:manipulation; }
+    .pause { position:absolute; z-index:2; left:14px; top:14px; width:44px; height:44px; border:2px solid #fff8; border-radius:12px; color:white; background:#10172bd9; cursor:pointer; font-size:18px; box-shadow:0 3px 0 #0005; }
+    .pause:hover { background:#293550; transform:translateY(-1px); }
+    .overlay { position:absolute; inset:0; z-index:3; display:grid; place-items:center; padding:18px; background:linear-gradient(#0b1228a8,#0b1228c9); backdrop-filter:blur(3px); }
+    .overlay.hidden { display:none; }
+    .card { width:min(440px,100%); max-height:100%; overflow:auto; padding:24px; border:2px solid #ddce9b; border-radius:16px; background:linear-gradient(145deg,#202b48,#121a30); box-shadow:0 10px 0 #090d19,0 18px 40px #0007; text-align:center; }
+    .eyebrow { color:var(--mint); font-size:11px; font-weight:900; letter-spacing:.2em; text-transform:uppercase; }
+    .card h2 { margin:7px 0 8px; font-size:clamp(24px,4vw,34px); }
+    .card p { margin:8px 0 18px; color:#c2cbe0; font-size:14px; line-height:1.55; }
+    .menu-buttons { display:grid; gap:9px; margin-top:18px; }
+    button { font:inherit; }
+    .action { min-height:46px; padding:10px 16px; border:2px solid #f5dfa0; border-radius:10px; color:#182039; background:var(--gold); box-shadow:0 4px 0 #b68136; font-weight:900; cursor:pointer; transition:transform .12s,filter .12s; }
+    .action:hover:not(:disabled) { filter:brightness(1.08); transform:translateY(-2px); }
+    .action:active:not(:disabled) { transform:translateY(2px); box-shadow:0 2px 0 #b68136; }
+    .action.secondary { color:var(--ink); background:#344363; border-color:#7584a3; box-shadow:0 4px 0 #1a2338; }
+    .action:disabled { cursor:not-allowed; opacity:.43; filter:grayscale(.5); }
+    .subview { display:none; }
+    .subview.active { display:block; }
+    .back { width:100%; margin-top:12px; min-height:40px; border:1px solid #677491; border-radius:9px; color:#e8eafa; background:#26324d; font-weight:800; cursor:pointer; }
+    .skins { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:15px 0; }
+    .skin { min-width:0; padding:8px 4px; border:2px solid #475573; border-radius:10px; color:#dce2f0; background:#11192d; cursor:pointer; font-size:11px; font-weight:800; }
+    .skin.selected { border-color:var(--gold); background:#323b50; box-shadow:0 0 0 2px #ffd45b35; }
+    .skin img { width:100%; height:74px; object-fit:contain; image-rendering:pixelated; }
+    .instructions { padding:12px; border-radius:10px; color:#e5e9f4; background:#0e1527; text-align:left; font-size:13px; line-height:1.6; }
+    .footer { display:flex; justify-content:space-between; margin:10px 4px 0; color:#aab4cc; font-size:12px; }
+    .footer strong { color:var(--gold); }
+    @media(max-width:600px) { body { padding:12px; } .brand-note { display:none; } .brand { margin-bottom:8px; }.stage { border-radius:11px; } .overlay { padding:9px; } .card { padding:15px; border-radius:12px; }.card p { margin:5px 0 10px; font-size:12px; }.menu-buttons { gap:7px; margin-top:10px; }.action { min-height:40px; padding:7px 12px; }.skin img { height:54px; } .footer { font-size:10px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="brand"><h1>Pixel <span>Gol</span></h1><div class="brand-note">Tek dokunuş • Sonsuz mücadele • Tek seviye</div></header>
+    <section class="stage" aria-label="Pixel Gol oyun alanı">
+      <canvas id="game" width="960" height="600" aria-label="Flappy Bird oyun alanı"></canvas>
+      <button id="pauseBtn" class="pause" aria-label="Menüyü aç" title="Menü (Esc)">Ⅱ</button>
+      <div class="overlay" id="overlay">
+        <section class="card" aria-live="polite">
+          <div class="main-view" id="mainView">
+            <div class="eyebrow">Sahaya çıkmaya hazır mısın?</div>
+            <h2 id="menuTitle">Pixel Gol</h2>
+            <p id="menuHint">Dokun, zıpla ve engellerin arasından geç. En yüksek skorunu yap!</p>
+            <div class="menu-buttons">
+              <button class="action" id="startBtn">Oyunu başlat</button>
+              <button class="action secondary" id="resumeBtn" disabled>Devam et</button>
+              <button class="action secondary" data-view="costumes">Kostümler</button>
+              <button class="action secondary" data-view="about">Hakkında</button>
+            </div>
+          </div>
+          <div class="subview" id="costumesView">
+            <div class="eyebrow">Tarzını seç</div><h2>Kostümler</h2>
+            <p>Maça hangi formayla çıkıyorsun?</p>
+            <div class="skins" id="skins"></div>
+            <button class="back" data-back>Menüye dön</button>
+          </div>
+          <div class="subview" id="aboutView">
+            <div class="eyebrow">Oyuncu rehberi</div><h2>Nasıl oynanır?</h2>
+            <div class="instructions"><b>Bilgisayar:</b> Zıplamak için boşluk, ↑ veya fare tıklaması. Menüyü açmak için Esc.<br><b>Telefon:</b> Ekrana dokunarak zıpla; sol üstteki Ⅱ düğmesi menüyü açar.<br>Engellere çarpmadan ilerle, her geçişte puan kazan!</div>
+            <p>Geliştirici: <strong style="color:#ffd45b">Taylan Özgür Çalın</strong></p>
+            <button class="back" data-back>Menüye dön</button>
+          </div>
+        </section>
+      </div>
+    </section>
+    <footer class="footer"><span>Kontrol: <strong>Space</strong> / dokun</span><span>Rekor: <strong id="bestScore">0</strong></span><span>Seviye 1</span></footer>
+  </main>
+<script>
+(() => {
+  const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height, groundY = 545;
+  const overlay = document.getElementById('overlay'), startBtn = document.getElementById('startBtn'), resumeBtn = document.getElementById('resumeBtn');
+  const birdFiles = ['img/1.png','img/2.png','img/3.png','img/4.png'];
+  const birds = birdFiles.map(src => { const im = new Image(); im.src = src; return im; });
+  const names = ['Büyücü','Sarı Forma','Lacivert','Kaptan'];
+  let selected = Math.max(0, Math.min(3, Number(localStorage.getItem('pixelGolSkin')) || 0));
+  let best = Number(localStorage.getItem('pixelGolBest')) || 0;
+  document.getElementById('bestScore').textContent = best;
+  const bird = { x:220, y:285, vy:0, r:24 }, pipes = [];
+  let score = 0, state = 'menu', frame = 0, pipeTimer = 0, groundOffset = 0;
+  const skins = document.getElementById('skins');
+  birdFiles.forEach((src,i) => {
+    const b = document.createElement('button'); b.className = 'skin'; b.innerHTML = `<img src="${src}" alt=""><span>${names[i]}</span>`;
+    b.addEventListener('click', () => { selected=i; localStorage.setItem('pixelGolSkin',i); refreshSkins(); }); skins.appendChild(b);
+  });
+  function refreshSkins(){ [...skins.children].forEach((el,i)=>el.classList.toggle('selected',i===selected)); }
+  refreshSkins();
+  function setOverlay(show){ overlay.classList.toggle('hidden',!show); }
+  function updateMenu(){
+    const paused = state === 'paused';
+    resumeBtn.disabled = !paused;
+    startBtn.textContent = state === 'over' ? 'Yeniden başla' : 'Oyunu başlat';
+    document.getElementById('menuTitle').textContent = paused ? 'Oyun duraklatıldı' : 'Pixel Gol';
+    document.getElementById('menuHint').textContent = paused ? 'Hazır olduğunda kaldığın yerden devam et.' : state === 'over' ? `Maç bitti! Skorun: ${score} • Yeni bir denemeye ne dersin?` : 'Dokun, zıpla ve engellerin arasından geç. En yüksek skorunu yap!';
+  }
+  function openMenu(){ if(state==='playing') state='paused'; updateMenu(); showMain(); setOverlay(true); }
+  function showMain(){ document.getElementById('mainView').style.display='block'; document.querySelectorAll('.subview').forEach(v=>v.classList.remove('active')); }
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('mainView').style.display='none'; document.getElementById(b.dataset.view+'View').classList.add('active'); }));
+  document.querySelectorAll('[data-back]').forEach(b=>b.addEventListener('click',()=>{ showMain(); updateMenu(); }));
+  function reset(){ score=0; bird.y=285; bird.vy=0; pipes.length=0; pipeTimer=0; frame=0; state='playing'; setOverlay(false); }
+  startBtn.addEventListener('click', reset);
+  resumeBtn.addEventListener('click',()=>{ if(state==='paused'){state='playing';setOverlay(false);} });
+  document.getElementById('pauseBtn').addEventListener('click',openMenu);
+  function flap(){ if(state==='playing'){bird.vy=-5.8;} }
+  canvas.addEventListener('pointerdown',e=>{ e.preventDefault(); flap(); });
+  window.addEventListener('keydown',e=>{
+    if(e.code==='Escape'){ e.preventDefault(); if(state==='playing') openMenu(); else { updateMenu();showMain();setOverlay(true); } return; }
+    if(['Space','ArrowUp','KeyW'].includes(e.code)){ e.preventDefault(); if(state==='playing') flap(); else if(state==='menu'&&!overlay.classList.contains('hidden')) reset(); }
+  });
+  function makePipe(){ const gap=230, top=85+Math.random()*(groundY-gap-155); pipes.push({x:W+30,top,gap,passed:false}); }
+  function roundedRect(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=4;ctx.stroke();}}
+  function drawBackground(){
+    const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#182c4b');sky.addColorStop(1,'#4a7890');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    // floodlights and blocky stadium stands
+    ctx.fillStyle='#f8edb6';ctx.globalAlpha=.9;[[90,90],[870,90]].forEach(([x,y])=>{ctx.fillRect(x-3,y,6,52);ctx.fillRect(x-26,y-9,52,13);for(let i=0;i<5;i++)ctx.fillRect(x-22+i*10,y-6,5,5);});ctx.globalAlpha=1;
+    ctx.fillStyle='#243d5a';ctx.fillRect(0,190,W,178);
+    for(let row=0;row<4;row++){for(let x=(row%2)*18;x<W;x+=36){ctx.fillStyle=['#375574','#b14a55','#e1bd5a','#31526c'][((x/36|0)+row)%4];ctx.fillRect(x,205+row*35,22,14);}}
+    ctx.fillStyle='#192d48';ctx.fillRect(0,350,W,30);
+    ctx.fillStyle='#70bd75';ctx.fillRect(0,380,W,groundY-380);
+    for(let x=0;x<W;x+=100){ctx.fillStyle=x%200?'#66b56d':'#79c47b';ctx.fillRect(x,380,50,groundY-380);}
+    // distant goal shapes
+    ctx.strokeStyle='#d8e7df55';ctx.lineWidth=5;ctx.strokeRect(26,310,124,70);ctx.strokeRect(W-150,310,124,70);
+    ctx.fillStyle='#d3c47f';ctx.fillRect(0,groundY,W,H-groundY);ctx.fillStyle='#8e7546';ctx.fillRect(0,groundY,W,8);
+    for(let x=-(groundOffset%48);x<W;x+=48){ctx.fillStyle='#a28b58';ctx.fillRect(x,groundY+14,24,5);ctx.fillRect(x+24,groundY+29,24,5);}
+  }
+  function drawPipe(p){
+    const bottomY=p.top+p.gap, cap=23;
+    const grad=ctx.createLinearGradient(p.x,0,p.x+78,0);grad.addColorStop(0,'#177c58');grad.addColorStop(.5,'#42c47e');grad.addColorStop(1,'#166647');
+    ctx.fillStyle=grad;ctx.fillRect(p.x,0,78,p.top);ctx.fillRect(p.x,bottomY,78,groundY-bottomY);
+    ctx.fillStyle='#9af0a3';ctx.fillRect(p.x+8,0,8,p.top-8);ctx.fillRect(p.x+8,bottomY+8,8,groundY-bottomY-8);
+    ctx.fillStyle='#10503f';ctx.fillRect(p.x+65,0,13,p.top);ctx.fillRect(p.x+65,bottomY,13,groundY-bottomY);
+    ctx.fillStyle='#f2cd56';ctx.fillRect(p.x-8,p.top-cap,94,cap);ctx.fillRect(p.x-8,bottomY,94,cap);
+    ctx.fillStyle='#fff0a4';ctx.fillRect(p.x-4,p.top-cap+4,8,cap-8);ctx.fillRect(p.x-4,bottomY+4,8,cap-8);
+    ctx.fillStyle='#8a642e';ctx.fillRect(p.x-8,p.top-cap,94,4);ctx.fillRect(p.x-8,bottomY+cap-4,94,4);
+  }
+  function drawBird(){
+    ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(Math.max(-.35,Math.min(.8,bird.vy*.045)));
+    const img=birds[selected]; if(img.complete&&img.naturalWidth){ctx.imageSmoothingEnabled=false;ctx.drawImage(img,-34,-35,68,68);}else{ctx.fillStyle='#ffd34e';ctx.beginPath();ctx.arc(0,0,23,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+  }
+  function draw(){
+    drawBackground();pipes.forEach(drawPipe);drawBird();
+    if(state==='playing'||state==='paused'){
+      ctx.textAlign='center';ctx.font='900 54px system-ui';ctx.lineWidth=7;ctx.strokeStyle='#17213c';ctx.strokeText(score,W/2,74);ctx.fillStyle='#fff4ca';ctx.fillText(score,W/2,74);
+    }
+    if(state==='menu'){
+      ctx.fillStyle='#fff3c8';ctx.textAlign='center';ctx.font='900 23px system-ui';ctx.fillText('BAŞLAMAK İÇİN OYUNU BAŞLAT',W/2,490);
+    }
+  }
+  function collide(p){const left=bird.x-bird.r+11,right=bird.x+bird.r-11,top=bird.y-bird.r+11,bottom=bird.y+bird.r-11;return right>p.x-7&&left<p.x+86&&(top<p.top||bottom>p.top+p.gap);}
+  function endGame(){state='over';updateMenu();showMain();setOverlay(true);}
+  function tick(){
+    if(state==='playing'){
+      frame++;bird.vy+=.22;bird.y+=bird.vy;groundOffset+=2.5;pipeTimer++;
+      if(pipeTimer>145){makePipe();pipeTimer=0;}
+      for(const p of pipes){p.x-=2.5;if(!p.passed&&p.x+78<bird.x){p.passed=true;score++;if(score>best){best=score;localStorage.setItem('pixelGolBest',best);document.getElementById('bestScore').textContent=best;}}if(collide(p)){endGame();break;}}
+      while(pipes.length&&pipes[0].x<-110)pipes.shift();
+      if(bird.y+bird.r>=groundY||bird.y-bird.r<0)endGame();
+    } else if(state==='menu'){bird.y=285+Math.sin(Date.now()/280)*9;bird.vy=0;}
+    draw();requestAnimationFrame(tick);
+  }
+  updateMenu();requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
